@@ -128,28 +128,24 @@
     const audioSolve = new Audio('パウッと解決_音声.mp3');
     const audioAllClear = new Audio('パウパトロール出動.mp3');
 
+    // iPad / Safariの「自動再生ロック」を安全に外す関数
     function unlockAndPreloadAudio() {
         audioSolve.load();
         audioAllClear.load();
         
-        const mutePlaySolve = audioSolve.play();
-        if (mutePlaySolve !== undefined) {
-            mutePlaySolve.then(() => { audioSolve.pause(); audioSolve.currentTime = 0; }).catch(() => {});
-        }
-        const mutePlayAll = audioAllClear.play();
-        if (mutePlayAll !== undefined) {
-            mutePlayAll.then(() => { audioAllClear.pause(); audioAllClear.currentTime = 0; }).catch(() => {});
-        }
+        // 空再生による強制ロック解除（エラーが出ても無視して進むようcatchを設定）
+        audioSolve.play().then(() => { audioSolve.pause(); audioSolve.currentTime = 0; }).catch(() => {});
+        audioAllClear.play().then(() => { audioAllClear.pause(); audioAllClear.currentTime = 0; }).catch(() => {});
     }
 
     function playSolveSound() {
         audioSolve.pause(); audioSolve.currentTime = 0;
-        audioSolve.play().catch(e => console.log("再生ブロック解除失敗"));
+        audioSolve.play().catch(e => console.log("再生失敗"));
     }
 
     function playAllClearSound() {
         audioAllClear.pause(); audioAllClear.currentTime = 0;
-        audioAllClear.play().catch(e => console.log("再生ブロック解除失敗"));
+        audioAllClear.play().catch(e => console.log("再生失敗"));
     }
 
     let alarmAudioCtx = null;
@@ -204,18 +200,14 @@
     let triggeredAlarms = new Set();
     let isEditMode = false;
 
-    // データ読み込み処理
     function loadData() {
         const saved = localStorage.getItem('paw_web_app_v6_base');
         if (saved) {
             const parsed = JSON.parse(saved);
-            // パパが追加・変更した「タスクの項目名と並び順」および「出発時間設定」はそのまま引き継ぐ
             appData.tasks = parsed.tasks;
             appData.departureTime = parsed.departureTime;
             if (parsed.alarms) appData.alarms = parsed.alarms;
         }
-        
-        // 【今回の変更点】アプリ起動（読み込み）時に、すべての完了状態を強制的に未完了（リセット）にする
         forceResetTaskStatus();
     }
 
@@ -223,4 +215,277 @@
         localStorage.setItem('paw_web_app_v6_base', JSON.stringify(appData)); 
     }
 
-    // タスクの「できた」状態と「割り当てられたキャラクター」だけを真っさらにする関数
+    function forceResetTaskStatus() {
+        appData.tasks.forEach(t => { 
+            t.done = false; 
+            delete t.assignedCharId; 
+        });
+        triggeredAlarms.clear();
+        renderTasks();
+    }
+
+    function renderTasks() {
+        const list = document.getElementById('taskList');
+        list.innerHTML = '';
+
+        appData.tasks.forEach((task) => {
+            const li = document.createElement('li');
+            li.className = `flex items-center justify-between bg-white rounded-2xl p-4 border-2 shadow-sm transition-all duration-300 ${task.done ? 'border-orange-300 bg-orange-50/30' : 'border-gray-200'}`;
+            li.dataset.id = task.id;
+
+            const leftDiv = document.createElement('div');
+            leftDiv.className = "flex items-center gap-3 flex-1";
+
+            const emojiSpan = document.createElement('span');
+            emojiSpan.className = "text-4xl p-1 bg-gray-50 rounded-lg";
+            emojiSpan.innerText = task.emoji || "📝";
+            leftDiv.appendChild(emojiSpan);
+
+            const textSpan = document.createElement('span');
+            textSpan.className = `text-xl md:text-2xl font-extrabold ${task.done ? 'text-gray-400 line-through' : 'text-gray-800'}`;
+            textSpan.innerText = task.text;
+            leftDiv.appendChild(textSpan);
+
+            li.appendChild(leftDiv);
+
+            const rightDiv = document.createElement('div');
+            rightDiv.className = "flex items-center gap-3";
+
+            if (isEditMode) {
+                const btnDelete = document.createElement('button');
+                btnDelete.className = "bg-red-500 hover:bg-red-600 text-white font-extrabold px-3 py-2 rounded-xl text-sm shadow active:scale-95 flex items-center gap-1";
+                btnDelete.innerHTML = '<i class="fa-solid fa-trash"></i> けす';
+                btnDelete.addEventListener('click', (e) => { e.stopPropagation(); deleteTask(task.id); });
+                rightDiv.appendChild(btnDelete);
+            }
+
+            if (task.done) {
+                const charId = task.assignedCharId || 'c1';
+                const char = characterProfiles.find(c => c.id === charId);
+
+                const rewardContainer = document.createElement('div');
+                rewardContainer.className = "flex flex-col items-center cursor-pointer";
+                rewardContainer.addEventListener('click', () => { if (!isEditMode) toggleTask(task.id); });
+
+                const img = document.createElement('img');
+                img.className = "character-avatar";
+                img.src = char.file; 
+                img.alt = char.name;
+                img.style.borderColor = char.border;
+
+                img.onerror = () => {
+                    img.style.display = 'none';
+                    const placeholder = document.createElement('div');
+                    placeholder.style.backgroundColor = char.color;
+                    placeholder.style.borderColor = char.border;
+                    placeholder.className = "w-[80px] h-[80px] rounded-full border-4 flex flex-col items-center justify-center shadow-lg float-animation";
+                    placeholder.innerHTML = `<span class="text-[11px] font-black text-gray-700">${char.name}</span>`;
+                    rewardContainer.insertBefore(placeholder, rewardContainer.firstChild);
+                };
+
+                rewardContainer.appendChild(img);
+
+                const miniBadge = document.createElement('span');
+                miniBadge.className = "bg-orange-500 text-white text-xs font-black px-2 py-0.5 rounded-full -mt-2 z-10 shadow-sm";
+                miniBadge.innerText = "できた！";
+                rewardContainer.appendChild(miniBadge);
+
+                rightDiv.appendChild(rewardContainer);
+            } else {
+                const btnDone = document.createElement('button');
+                btnDone.className = "bg-gradient-to-r from-orange-400 to-amber-400 text-white font-extrabold text-xl py-3 px-6 rounded-2xl shadow active:scale-95 transition-all";
+                btnDone.innerText = "できた！";
+                btnDone.addEventListener('click', () => { if (!isEditMode) toggleTask(task.id); });
+                rightDiv.appendChild(btnDone);
+            }
+
+            li.appendChild(rightDiv);
+            list.appendChild(li);
+        });
+    }
+
+    function toggleTask(id) {
+        const task = appData.tasks.find(t => t.id === id);
+        if (task) {
+            task.done = !task.done;
+            if (task.done) {
+                const usedCharIds = appData.tasks.filter(t => t.done && t.assignedCharId).map(t => t.assignedCharId);
+                const available = characterProfiles.filter(c => !usedCharIds.includes(c.id));
+                let selected = available.length > 0 ? available[Math.floor(Math.random() * available.length)] : characterProfiles[Math.floor(Math.random() * characterProfiles.length)];
+                
+                task.assignedCharId = selected.id;
+                saveData();
+                renderTasks();
+
+                const allDone = appData.tasks.every(t => t.done);
+                if (allDone) {
+                    playAllClearSound();
+                    document.getElementById('mainContainer').classList.add('all-cleared-panel');
+                    setTimeout(() => { document.getElementById('mainContainer').classList.remove('all-cleared-panel'); }, 3000);
+                } else {
+                    playSolveSound();
+                }
+            } else {
+                delete task.assignedCharId;
+                saveData();
+                renderTasks();
+            }
+        }
+    }
+
+    function addTask() {
+        const input = document.getElementById('newTaskInput');
+        const text = input.value.trim();
+        if (text) {
+            let emoji = "📝";
+            if (text.includes("ごはん") || text.includes("たべる")) emoji = "🍙";
+            else if (text.includes("はみがき") || text.includes("はぶらし")) emoji = "🪥";
+            else if (text.includes("おきがえ") || text.includes("ズボン") || text.includes("ふく")) emoji = "👕";
+            else if (text.includes("かばん") || text.includes("じゅんび")) emoji = "🎒";
+            else if (text.includes("くつ")) emoji = "👟";
+            else if (text.includes("トイレ") || text.includes("おしっこ")) emoji = "🚽";
+
+            appData.tasks.push({ id: Date.now(), text: text, emoji: emoji, done: false });
+            input.value = '';
+            saveData();
+            renderTasks();
+
+            setTimeout(() => {
+                const mainEl = document.querySelector('main');
+                if (mainEl) mainEl.scrollTop = mainEl.scrollHeight;
+            }, 80);
+        }
+    }
+
+    function deleteTask(id) {
+        appData.tasks = appData.tasks.filter(t => t.id !== id);
+        saveData();
+        renderTasks();
+    }
+
+    // 編集モード
+    const btnToggleEdit = document.getElementById('btnToggleEdit');
+    const btnToggleEditText = document.getElementById('btnToggleEditText');
+    const editNotice = document.getElementById('editNotice');
+
+    btnToggleEdit.addEventListener('click', () => {
+        isEditMode = !isEditMode;
+        if (isEditMode) {
+            btnToggleEdit.className = "bg-red-100 hover:bg-red-200 text-red-700 font-bold px-4 py-3 rounded-xl flex flex-col items-center gap-1 text-xs border border-red-200 animate-pulse";
+            btnToggleEditText.innerText = "おわる"; editNotice.classList.remove('hidden');
+        } else {
+            btnToggleEdit.className = "bg-amber-100 hover:bg-amber-200 text-amber-700 font-bold px-4 py-3 rounded-xl flex flex-col items-center gap-1 text-xs border border-amber-200";
+            btnToggleEditText.innerText = "へんしゅう"; editNotice.classList.add('hidden');
+        }
+        renderTasks();
+    });
+
+    // --- タイマー処理 ---
+    function updateTime() {
+        const now = new Date();
+        const hrs = String(now.getHours()).padStart(2, '0');
+        const mins = String(now.getMinutes()).padStart(2, '0');
+        document.getElementById('currentTime').innerText = `${hrs}:${mins}`;
+
+        const [depHours, depMinutes] = appData.departureTime.split(':').map(Number);
+        const depDate = new Date(); depDate.setHours(depHours, depMinutes, 0, 0);
+
+        let diffMs = depDate - now; let isOver = false;
+        if (diffMs < 0) { isOver = true; diffMs = Math.abs(diffMs); }
+        const diffMins = Math.floor(diffMs / 1000 / 60);
+
+        const remainingMinutesSpan = document.getElementById('remainingMinutes');
+        const remainingTimeDiv = document.getElementById('remainingTime');
+
+        if (isOver) {
+            remainingTimeDiv.innerHTML = `⚠️ しゅっぱつじかんを <span class="text-orange-500 text-2xl mx-1 font-black">${diffMins}</span> 分 すぎています！`;
+        } else {
+            remainingTimeDiv.innerHTML = `⏳ しゅっぱつまで あと <span class="text-orange-500 text-2xl" id="remainingMinutes">${diffMins}</span> 分`;
+            [30, 20, 10, 5, 0].forEach(triggerMin => {
+                if (diffMins === triggerMin && appData.alarms[triggerMin] && !triggeredAlarms.has(triggerMin)) {
+                    triggerAlarm(triggerMin); triggeredAlarms.add(triggerMin);
+                }
+            });
+        }
+    }
+
+    function triggerAlarm(minutes) {
+        playAlarmSound();
+        setTimeout(() => {
+            if (minutes === 0) speakText("しゅっぱつの時間だよ！さあ、でかけよう！");
+            else speakText(`しゅっぱつまで、あと${minutes}分だよ！おしたくをいそごう！`);
+        }, 1200);
+
+        const overlay = document.getElementById('alarmOverlay');
+        const title = document.getElementById('alarmTitle');
+        const msg = document.getElementById('alarmMessage');
+        if (minutes === 0) { title.innerText = "しゅっぱつの時間！"; msg.innerText = "さあ、ようちえんへ しゅっぱつだ！🐾"; } 
+        else { title.innerText = `あと ${minutes} 分だよ！`; msg.innerText = "おしたくは ばっちりかな?🐾"; }
+        overlay.classList.remove('hidden');
+    }
+
+    function closeAlarm() { document.getElementById('alarmOverlay').classList.add('hidden'); }
+
+    // 【修正箇所】スタートボタン押下時の処理順序の最適化
+    function startApp() {
+        // 1. まず確実にスタート画面（おおい）を非表示にしてメイン画面へ切り替える
+        document.getElementById('startOverlay').classList.add('hidden');
+        
+        // 2. その後、裏側で安全にブラウザの音声ロックを解除
+        unlockAndPreloadAudio();
+        
+        // 3. もし「すでに最初から全タスクが完了状態」のときだけ、お祝い音声を鳴らす（それ以外は無音で正常開始）
+        const allDone = appData.tasks.every(t => t.done);
+        if (allDone && appData.tasks.length > 0) {
+            playAllClearSound();
+        }
+    }
+
+    // --- 長押し設定画面 ---
+    const settingsModal = document.getElementById('settingsModal');
+    let pressTimer;
+    btnToggleEdit.addEventListener('mousedown', () => { pressTimer = window.setTimeout(() => { initSettingsUI(); settingsModal.classList.remove('hidden'); }, 1500); });
+    btnToggleEdit.addEventListener('mouseup', () => clearTimeout(pressTimer));
+    btnToggleEdit.addEventListener('touchstart', () => { pressTimer = window.setTimeout(() => { initSettingsUI(); settingsModal.classList.remove('hidden'); }, 1500); });
+    btnToggleEdit.addEventListener('touchend', () => clearTimeout(pressTimer));
+
+    document.getElementById('btnCloseSettings').addEventListener('click', () => { settingsModal.classList.add('hidden'); });
+    document.getElementById('btnSaveAndClose').addEventListener('click', () => {
+        appData.departureTime = document.getElementById('departureTimeInput').value;
+        saveData(); settingsModal.classList.add('hidden'); triggeredAlarms.clear();
+    });
+
+    function initSettingsUI() {
+        document.getElementById('departureTimeInput').value = appData.departureTime;
+        const toggleList = document.getElementById('alarmToggleList');
+        toggleList.innerHTML = '';
+        [5, 0].forEach(min => {
+            const labelText = min === 0 ? "しゅっぱつ時刻のアラーム" : `${min}分前のアラーム`;
+            const div = document.createElement('div');
+            div.className = 'flex justify-between items-center py-2 border-b border-gray-100';
+            div.innerHTML = `
+                <span class="font-bold text-gray-700 text-sm">${labelText}</span>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="alarm-${min}" ${appData.alarms[min] ? 'checked' : ''} class="sr-only peer">
+                    <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
+                </label>
+            `;
+            toggleList.appendChild(div);
+            div.querySelector('input').addEventListener('change', (e) => { appData.alarms[min] = e.target.checked; saveData(); });
+        });
+    }
+
+    // 各種イベントリスナーとの紐付け
+    document.getElementById('btnAdd').addEventListener('click', addTask);
+    document.getElementById('newTaskInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') addTask();
+    });
+
+    window.onload = () => {
+        loadData();
+        setInterval(updateTime, 1000);
+        updateTime();
+    };
+</script>
+</body>
+</html>
