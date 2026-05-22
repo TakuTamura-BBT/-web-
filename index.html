@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>あさのじゅんびアプリ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Hiragino Maru Gothic ProN', 'Yu Gothic', sans-serif;
+            background-color: #fff3e0;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-6px); }
+            100% { transform: translateY(0px); }
+        }
+        .float-animation {
+            animation: float 3s ease-in-out infinite;
+        }
+        .character-avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 4px solid #ff9800;
+            box-shadow: 0 6px 12px rgba(255, 152, 0, 0.4);
+            object-fit: cover;
+            animation: popChar 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            background-color: white;
+        }
+        @keyframes popChar {
+            0% { transform: scale(0) rotate(-20deg); }
+            100% { transform: scale(1) rotate(0deg); }
+        }
+        @keyframes celebrate {
+            0% { transform: scale(1); background-color: white; }
+            50% { transform: scale(1.02); background-color: #fffde7; border-color: #ffb74d; }
+            100% { transform: scale(1); background-color: white; }
+        }
+        .all-cleared-panel {
+            animation: celebrate 1s ease-in-out 3;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-between p-3 md:p-6 overflow-x-hidden">
+
+<div id="startOverlay" class="fixed inset-0 bg-amber-100 z-50 flex flex-col items-center justify-center p-6 text-center">
+    <div class="bg-white p-6 rounded-3xl shadow-xl max-w-sm border-4 border-amber-400 flex flex-col items-center">
+        <img src="ケント.png" id="kentStartImg" class="w-48 h-auto object-contain mb-4 float-animation" alt="ケント" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' width=\'100\' height=\'100\'><text y=\'20\' font-size=\'20\'>👦</text></svg>'">
+        <h1 class="text-2xl font-extrabold text-amber-600 mb-1">あさのじゅんびアプリ</h1>
+        <p class="text-xs text-amber-500 font-bold mb-4">パウ・パトロールのみんなと じゅんびしよう！</p>
+        <button onclick="startApp()" class="w-full bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white font-extrabold text-xl py-4 px-6 rounded-2xl shadow-lg transform active:scale-95 transition-all">
+            スタート！ 🐾
+        </button>
+    </div>
+</div>
+
+<div id="mainContainer" class="w-full max-w-2xl bg-white rounded-3xl shadow-xl border-4 border-amber-300 p-4 md:p-6 flex flex-col justify-between flex-grow relative">
+    
+    <header class="flex justify-between items-center bg-amber-50 rounded-2xl p-4 mb-4 border-2 border-amber-100">
+        <div class="flex-grow text-center">
+            <div class="text-4xl md:text-5xl font-extrabold text-orange-500 tracking-wider" id="currentTime">00:00</div>
+            <div class="text-lg md:text-xl font-bold text-gray-700 mt-2 flex items-center justify-center gap-2" id="remainingTime">
+                <span class="text-2xl">⏳</span> しゅっぱつまで あと <span class="text-orange-500 text-2xl" id="remainingMinutes">--</span> 分
+            </div>
+        </div>
+        <button id="btnToggleEdit" class="bg-amber-100 hover:bg-amber-200 text-amber-700 font-bold px-4 py-3 rounded-xl flex flex-col items-center gap-1 transition-colors text-xs border border-amber-200">
+            <i class="fa-solid fa-pen-to-square text-lg"></i>
+            <span id="btnToggleEditText">へんしゅう</span>
+        </button>
+    </header>
+
+    <div id="editNotice" class="hidden bg-red-50 text-red-600 font-bold px-4 py-2 rounded-xl mb-3 text-center border border-red-200 text-sm">
+        ⚠️ へんしゅうモード中：タスクを「けす」ことができます。
+    </div>
+
+    <main class="flex-grow overflow-y-auto mb-4 px-1" style="max-height: 52vh;">
+        <ul id="taskList" class="space-y-4"></ul>
+    </main>
+
+    <footer id="addTaskFooter" class="bg-gray-50 p-3 rounded-2xl border-2 border-dashed border-amber-200">
+        <div class="flex gap-2">
+            <input type="text" id="newTaskInput" placeholder="新しいやること（例：くつをはく）" class="flex-1 px-4 py-3 rounded-xl border-2 border-amber-100 focus:outline-none focus:border-amber-300 font-bold text-lg">
+            <button id="btnAdd" class="bg-amber-400 hover:bg-amber-500 text-white font-bold text-2xl px-6 rounded-xl transition-all active:scale-95">
+                ＋
+            </button>
+        </div>
+    </footer>
+</div>
+
+<div id="alarmOverlay" class="hidden fixed inset-0 bg-black/60 z-40 flex items-center justify-center p-6">
+    <div class="bg-gradient-to-r from-orange-500 to-red-500 text-white p-8 rounded-3xl text-center shadow-2xl max-w-sm border-4 border-white float-animation">
+        <span class="text-7xl block mb-4">⏰</span>
+        <h2 id="alarmTitle" class="text-3xl font-extrabold mb-4">しゅっぱつの時間！</h2>
+        <p id="alarmMessage" class="text-xl font-bold mb-6">いそいで準備しよう！</p>
+        <button onclick="closeAlarm()" class="bg-white text-orange-600 font-extrabold text-xl py-3 px-8 rounded-full shadow hover:bg-amber-50 active:scale-95 transition-all">
+            わかった！ 👍
+        </button>
+    </div>
+</div>
+
+<div id="settingsModal" class="hidden fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-lg rounded-3xl p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
+        <div class="flex justify-between items-center border-b-2 border-amber-100 pb-3 mb-4">
+            <h3 class="text-2xl font-bold text-gray-800">⚙️ 時間・アラーム設定</h3>
+            <button id="btnCloseSettings" class="text-gray-400 hover:text-gray-600 text-2xl"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="mb-6">
+            <label class="block text-gray-700 font-bold mb-2">⏰ しゅっぱつ時間設定:</label>
+            <input type="time" id="departureTimeInput" class="w-full p-3 border-2 border-amber-100 rounded-xl font-bold text-xl text-center focus:outline-none focus:border-amber-300">
+        </div>
+        <div class="mb-4">
+            <label class="block text-gray-700 font-bold mb-2">📢 アラーム時のお知らせ設定 (5分前・出発時):</label>
+            <div class="space-y-2" id="alarmToggleList"></div>
+        </div>
+        <button id="btnSaveAndClose" class="w-full bg-gradient-to-r from-amber-400 to-orange-500 text-white font-bold text-lg py-3 rounded-2xl transition-all">
+            設定を保存して閉じる ✨
+        </button>
+    </div>
+</div>
+
+<script>
+    // --- 音声再生エンジン（GitHub Pages通信エラー完全対策版） ---
+    // 2つのMP3をブラウザ標準方式で管理（通信ブロックを受けない最も安全な手法）
+    const audioSolve = new Audio('パウッと解決_音声.mp3');
+    const audioAllClear = new Audio('パウパトロール出動.mp3');
+
+    // iPad / Safariの「自動再生ロック」を解除し、かつ事前にファイルを読み込ませる関数
+    function unlockAndPreloadAudio() {
+        audioSolve.load();
+        audioAllClear.load();
+        
+        // iOS特有の無音再生による強制ロック解除処理
+        const mutePlaySolve = audioSolve.play();
+        if (mutePlaySolve !== undefined) {
+            mutePlaySolve.then(() => { audioSolve.pause(); audioSolve.currentTime = 0; }).catch(() => {});
+        }
+        const mutePlayAll = audioAllClear.play();
+        if (mutePlayAll !== undefined) {
+            mutePlayAll.then(() => { audioAllClear.pause(); audioAllClear.currentTime = 0; }).catch(() => {});
+        }
+    }
+
+    // ① 1タスク完了音（パウッと解決！）
+    function playSolveSound() {
+        audioSolve.pause();
+        audioSolve.currentTime = 0;
+        audioSolve.play().catch(e => console.log("再生ブロック解除失敗"));
+    }
+
+    // ② 全タスク完了音（パウパトロール出動！）
+    function playAllClearSound() {
+        audioAllClear.pause();
+        audioAllClear.currentTime = 0;
+        audioAllClear.play().catch(e => console.log("再生ブロック解除失敗"));
+    }
+
+    // アラーム電子音（Web Audio APIによるシンセサイザー合成音）
+    let alarmAudioCtx = null;
+    function playAlarmSound() {
+        if (!alarmAudioCtx) { alarmAudioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+        const now = alarmAudioCtx.currentTime;
+        for (let i = 0; i < 4; i++) {
+            const time = now + i * 0.25;
+            const osc = alarmAudioCtx.createOscillator();
+            const gain = alarmAudioCtx.createGain();
+            osc.type = 'sine'; osc.frequency.setValueAtTime(1500, time);
+            gain.gain.setValueAtTime(0, time); gain.gain.linearRampToValueAtTime(0.15, time + 0.01); gain.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
+            osc.connect(gain); gain.connect(alarmAudioCtx.destination);
+            osc.start(time); osc.stop(time + 0.15);
+        }
+    }
+
+    function speakText(text) {
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'ja-JP'; utterance.rate = 0.95; utterance.pitch = 1.25;
+            window.speechSynthesis.speak(utterance);
+        }
+    }
+
+    // キャラクターの定義
+    const characterProfiles = [
+        { id: 'c1', name: "チェイス", file: "チェイス.png", color: "#e3f2fd", border: "#1e88e5" },
+        { id: 'c2', name: "マーシャル", file: "マーシャル.png", color: "#ffebee", border: "#e53935" },
+        { id: 'c3', name: "スカイ", file: "スカイ.png", color: "#fce4ec", border: "#d81b60" },
+        { id: 'c4', name: "ラブル", file: "ラブル.png", color: "#fffde7", border: "#fbc02d" },
+        { id: 'c5', name: "ロッキー", file: "ロッキー.png", color: "#e8f5e9", border: "#43a047" },
+        { id: 'c6', name: "ズーマ", file: "ズーマ.png", color: "#fff3e0", border: "#fb8c00" },
+        { id: 'c7', name: "エベレスト", file: "エベレスト.png", color: "#e0f2f1", border: "#00acc1" }
+    ];
+
+    // デフォルトタスク（トイレに行く）
+    const defaultTasks = [
+        { id: 1, text: "あさごはんを たべる", emoji: "🍙", done: false },
+        { id: 2, text: "はみがきを する", emoji: "🪥", done: false },
+        { id: 3, text: "おきがえを する", emoji: "👕", done: false },
+        { id: 4, text: "トイレに いく", emoji: "🚽", done: false }
+    ];
+
+    let appData = {
+        tasks: defaultTasks,
+        departureTime: "08:15",
+        lastResetDate: new Date().toDateString(),
+        alarms: { 30: false, 20: false, 10: true, 5: true, 0: true }
+    };
+
+    let triggeredAlarms = new Set();
+    let isEditMode = false;
+
+    function loadData() {
+        const saved = localStorage.getItem('paw_web_app_v5');
+        if (saved) appData = JSON.parse(saved);
+        checkDateReset();
+        renderTasks();
+    }
+
+    function saveData() { localStorage.setItem('paw_web_app_v5', JSON.stringify(appData)); }
+
+    function checkDateReset() {
+        const today = new Date().toDateString();
+        if (appData.lastResetDate !== today) {
+            appData.tasks.forEach(t => { t.done = false; delete t.assignedCharId; });
+            appData.lastResetDate = today;
+            triggeredAlarms.clear();
+            saveData();
+        }
+    }
+
+    function renderTasks() {
+        const list = document.getElementById('taskList');
+        list.innerHTML = '';
+
+        appData.tasks.forEach((task) => {
+            const li = document.createElement('li');
+            li.className = `flex items-center justify-between bg-white rounded-2xl p-4 border-2 shadow-sm transition-all duration-300 ${task.done ? 'border-orange-300 bg-orange-50/30' : 'border-gray-200'}`;
+            li.dataset.id = task.id;
+
+            const leftDiv = document.createElement('div');
+            leftDiv.className = "flex items-center gap-3 flex-1";
+
+            const emojiSpan = document.createElement('span');
+            emojiSpan.className = "text-4xl p-1 bg-gray-50 rounded-lg";
+            emojiSpan.innerText = task.emoji || "📝";
+            leftDiv.appendChild(emojiSpan);
+
+            const textSpan = document.createElement('span');
+            textSpan.className = `text-xl md:text-2xl font-extrabold ${task.done ? 'text-gray-400 line-through' : 'text-gray-800'}`;
+            textSpan.innerText = task.text;
+            leftDiv.appendChild(textSpan);
+
+            li.appendChild(leftDiv);
+
+            const rightDiv = document.createElement('div');
+            rightDiv.className = "flex items-center gap-3";
+
+            if (isEditMode) {
+                const btnDelete = document.createElement('button');
+                btnDelete.className = "bg-red-500 hover:bg-red-600 text-white font-extrabold px-3 py-2 rounded-xl text-sm shadow active:scale-95 flex items-center gap-1";
+                btnDelete.innerHTML = '<i class="fa-solid fa-trash"></i> けす';
+                btnDelete.addEventListener('click', (e) => { e.stopPropagation(); deleteTask(task.id); });
+                rightDiv.appendChild(btnDelete);
+            }
+
+            if (task.done) {
+                const charId = task.assignedCharId || 'c1';
+                const char = characterProfiles.find(c => c.id === charId);
+
+                const rewardContainer = document.createElement('div');
+                rewardContainer.className = "flex flex-col items-center cursor-pointer";
+                rewardContainer.addEventListener('click', () => { if (!isEditMode) toggleTask(task.id); });
+
+                const img = document.createElement('img');
+                img.className = "character-avatar";
+                img.src = char.file; 
+                img.alt = char.name;
+                img.style.borderColor = char.border;
+
+                img.onerror = () => {
+                    img.style.display = 'none';
+                    const placeholder = document.createElement('div');
+                    placeholder.style.backgroundColor = char.color;
+                    placeholder.style.borderColor = char.border;
+                    placeholder.className = "w-[80px] h-[80px] rounded-full border-4 flex flex-col items-center justify-center shadow-lg float-animation";
+                    placeholder.innerHTML = `<span class="text-[11px] font-black text-gray-700">${char.name}</span>`;
+                    rewardContainer.insertBefore(placeholder, rewardContainer.firstChild);
+                };
+
+                rewardContainer.appendChild(img);
+
+                const miniBadge = document.createElement('span');
+                miniBadge.className = "bg-orange-500 text-white text-xs font-black px-2 py-0.5 rounded-full -mt-2 z-10 shadow-sm";
+                miniBadge.innerText = "できた！";
+                rewardContainer.appendChild(miniBadge);
+
+                rightDiv.appendChild(rewardContainer);
+            } else {
+                const btnDone = document.createElement('button');
+                btnDone.className = "bg-gradient-to-r from-orange-400 to-amber-400 text-white font-extrabold text-xl py-3 px-6 rounded-2xl shadow active:scale-95 transition-all";
+                btnDone.innerText = "できた！";
+                btnDone.addEventListener('click', () => { if (!isEditMode) toggleTask(task.id); });
+                rightDiv.appendChild(btnDone);
+            }
+
+            li.appendChild(rightDiv);
+            list.appendChild(li);
+        });
+    }
+
+    function toggleTask(id) {
+        const task = appData.tasks.find(t => t.id === id);
+        if (task) {
+            task.done = !task.done;
+            if (task.done) {
+                const usedCharIds = appData.tasks.filter(t => t.done && t.assignedCharId).map(t => t.assignedCharId);
+                const available = characterProfiles.filter(c => !usedCharIds.includes(c.id));
+                let selected = available.length > 0 ? available[Math.floor(Math.random() * available.length)] : characterProfiles[Math.floor(Math.random() * characterProfiles.length)];
+                
+                task.assignedCharId = selected.id;
+                saveData();
+                renderTasks();
+
+                const allDone = appData.tasks.every(t => t.done);
+                if (allDone) {
+                    playAllClearSound();
+                    document.getElementById('mainContainer').classList.add('all-cleared-panel');
+                    setTimeout(() => { document.getElementById('mainContainer').classList.remove('all-cleared-panel'); }, 3000);
+                } else {
+                    playSolveSound();
+                }
+            } else {
+                delete task.assignedCharId;
+                saveData();
+                renderTasks();
+            }
+        }
+    }
+
+    function addTask() {
+        const input = document.getElementById('newTaskInput');
+        const text = input.value.trim();
+        if (text) {
+            let emoji = "📝";
+            if (text.includes("ごはん") || text.includes("たべる")) emoji = "🍙";
+            else if (text.includes("はみがき") || text.includes("はぶらし")) emoji = "🪥";
+            else if (text.includes("おきがえ") || text.includes("ズボン") || text.includes("ふく")) emoji = "👕";
+            else if (text.includes("かばん") || text.includes("じゅんび")) emoji = "🎒";
+            else if (text.includes("くつ")) emoji = "👟";
+            else if (text.includes("トイレ") || text.includes("おしっこ")) emoji = "🚽";
+
+            appData.tasks.push({ id: Date.now(), text: text, emoji: emoji, done: false });
+            input.value = '';
+            saveData();
+            renderTasks();
+
+            setTimeout(() => {
+                const mainEl = document.querySelector('main');
+                if (mainEl) mainEl.scrollTop = mainEl.scrollHeight;
+            }, 80);
+        }
+    }
+
+    function deleteTask(id) {
+        appData.tasks = appData.tasks.filter(t => t.id !== id);
+        saveData();
+        renderTasks();
+    }
+
+    // 編集モード
+    const btnToggleEdit = document.getElementById('btnToggleEdit');
+    const btnToggleEditText = document.getElementById('btnToggleEditText');
+    const editNotice = document.getElementById('editNotice');
+
+    btnToggleEdit.addEventListener('click', () => {
+        isEditMode = !isEditMode;
+        if (isEditMode) {
+            btnToggleEdit.className = "bg-red-100 hover:bg-red-200 text-red-700 font-bold px-4 py-3 rounded-xl flex flex-col items-center gap-1 text-xs border border-red-200 animate-pulse";
+            btnToggleEditText.innerText = "おわる"; editNotice.classList.remove('hidden');
+        } else {
+            btnToggleEdit.className = "bg-amber-100 hover:bg-amber-200 text-amber-700 font-bold px-4 py-3 rounded-xl flex flex-col items-center gap-1 text-xs border border-amber-200";
+            btnToggleEditText.innerText = "へんしゅう"; editNotice.classList.add('hidden');
+        }
+        renderTasks();
+    });
+
+    // --- タイマー処理 ---
+    function updateTime() {
+        const now = new Date();
+        const hrs = String(now.getHours()).padStart(2, '0');
+        const mins = String(now.getMinutes()).padStart(2, '0');
+        document.getElementById('currentTime').innerText = `${hrs}:${mins}`;
+
+        const [depHours, depMinutes] = appData.departureTime.split(':').map(Number);
+        const depDate = new Date(); depDate.setHours(depHours, depMinutes, 0, 0);
+
+        let diffMs = depDate - now; let isOver = false;
+        if (diffMs < 0) { isOver = true; diffMs = Math.abs(diffMs); }
+        const diffMins = Math.floor(diffMs / 1000 / 60);
+
+        const remainingMinutesSpan = document.getElementById('remainingMinutes');
+        const remainingTimeDiv = document.getElementById('remainingTime');
+
+        if (isOver) {
+            remainingTimeDiv.innerHTML = `⚠️ しゅっぱつじかんを <span class="text-orange-500 text-2xl mx-1 font-black">${diffMins}</span> 分 すぎています！`;
+        } else {
+            remainingMinutesSpan.innerText = diffMins;
+            [30, 20, 10, 5, 0].forEach(triggerMin => {
+                if (diffMins === triggerMin && appData.alarms[triggerMin] && !triggeredAlarms.has(triggerMin)) {
+                    triggerAlarm(triggerMin); triggeredAlarms.add(triggerMin);
+                }
+            });
+        }
+        checkDateReset();
+    }
+
+    function triggerAlarm(minutes) {
+        playAlarmSound();
+        setTimeout(() => {
+            if (minutes === 0) speakText("しゅっぱつの時間だよ！さあ、でかけよう！");
+            else speakText(`しゅっぱつまで、あと${minutes}分だよ！おしたくをいそごう！`);
+        }, 1200);
+
+        const overlay = document.getElementById('alarmOverlay');
+        const title = document.getElementById('alarmTitle');
+        const msg = document.getElementById('alarmMessage');
+        if (minutes === 0) { title.innerText = "しゅっぱつの時間！"; msg.innerText = "さあ、ようちえんへ しゅっぱつだ！🐾"; } 
+        else { title.innerText = `あと ${minutes} 分だよ！`; msg.innerText = "おしたくは ばっちりかな？🐾"; }
+        overlay.classList.remove('hidden');
+    }
+
+    function closeAlarm() { document.getElementById('alarmOverlay').classList.add('hidden'); }
+
+    // アプリ開始ボタン（パパが押したとき）
+    function startApp() {
+        document.getElementById('startOverlay').classList.add('hidden');
+        
+        // 【重要】タップの瞬間にすべての音声プレイヤーの再生ロックを外す
+        unlockAndPreloadAudio();
+        
+        // 景気付けに出動音声を一瞬鳴らす（これで完璧に全完了時も音が鳴るようになります）
+        playAll
