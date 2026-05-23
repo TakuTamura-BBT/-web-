@@ -61,14 +61,54 @@
 
 <div id="mainContainer" class="w-full max-w-2xl bg-white rounded-3xl shadow-xl border-4 border-amber-300 p-4 md:p-6 flex flex-col justify-between flex-grow relative">
     
-    <header class="flex justify-between items-center bg-amber-50 rounded-2xl p-4 mb-4 border-2 border-amber-100">
-        <div class="flex-grow text-center">
-            <div class="text-4xl md:text-5xl font-extrabold text-orange-500 tracking-wider" id="currentTime">00:00</div>
-            <div class="text-lg md:text-xl font-bold text-gray-700 mt-2 flex items-center justify-center gap-2" id="remainingTime">
-                <span class="text-2xl">⏳</span> しゅっぱつまで あと <span class="text-orange-500 text-2xl" id="remainingMinutes">--</span> 分
+    <!-- Header with Analog Clock & Countdown Text -->
+    <header class="flex flex-col sm:flex-row justify-between items-center bg-amber-50 rounded-2xl p-4 mb-4 border-2 border-amber-100 gap-4">
+        <!-- Clock Panel Wrapper -->
+        <div class="flex items-center justify-center flex-1 gap-4 md:gap-6 w-full">
+            <!-- Analog Clock Container -->
+            <div class="relative w-36 h-36 md:w-44 md:h-44 flex-shrink-0 bg-white rounded-full shadow-md border-2 border-slate-100 flex items-center justify-center p-1">
+                <svg id="analogClock" viewBox="0 0 200 200" class="w-full h-full">
+                    <!-- Base face circle -->
+                    <circle cx="100" cy="100" r="97" fill="#ffffff" />
+                    
+                    <!-- Remaining Time Sector (Pie) -->
+                    <path id="blueSector" fill="rgba(37, 99, 235, 0.08)" d="" style="display: none;" />
+                    
+                    <!-- Dynamic Ticks Group -->
+                    <g id="clockTicks"></g>
+                    
+                    <!-- Remaining Time Outer Arc -->
+                    <path id="blueArc" fill="none" stroke="#2563eb" stroke-width="6.5" stroke-linecap="round" d="" style="display: none;" />
+                    
+                    <!-- Dynamic Numbers Group -->
+                    <g id="clockNumbers"></g>
+                    
+                    <!-- Hands (Ordered from bottom to top) -->
+                    <!-- Hour Hand (Thick) -->
+                    <line id="hourHand" x1="100" y1="100" x2="100" y2="58" stroke="#1e293b" stroke-width="6.5" stroke-linecap="round" />
+                    <!-- Minute Hand (Medium) -->
+                    <line id="minuteHand" x1="100" y1="100" x2="100" y2="34" stroke="#1e293b" stroke-width="4.5" stroke-linecap="round" />
+                    <!-- Second Hand (Thin with balance tail) -->
+                    <line id="secondHand" x1="100" y1="114" x2="100" y2="20" stroke="#ef4444" stroke-width="1.5" stroke-linecap="round" />
+                    
+                    <!-- Center Pin Cover -->
+                    <circle cx="100" cy="100" r="5" fill="#1e293b" />
+                    <circle cx="100" cy="100" r="2.2" fill="#ef4444" />
+                </svg>
+            </div>
+            
+            <!-- Digital Time & Countdown Text -->
+            <div class="text-left flex-1 min-w-[130px]">
+                <div class="text-xs font-black text-slate-400 mb-0.5">いまのじかん</div>
+                <div class="text-2xl md:text-3xl font-black text-slate-700 tracking-wider mb-2" id="currentTime">00:00</div>
+                <div class="text-sm md:text-base font-bold text-gray-700 flex flex-wrap items-center gap-1 leading-tight" id="remainingTime">
+                    <span>⏳</span> しゅっぱつまで あと <span class="text-orange-500 text-xl md:text-2xl font-black" id="remainingMinutes">--</span> 分
+                </div>
             </div>
         </div>
-        <button id="btnToggleEdit" class="bg-amber-100 hover:bg-amber-200 text-amber-700 font-bold px-4 py-3 rounded-xl flex flex-col items-center gap-1 transition-colors text-xs border border-amber-200">
+        
+        <!-- Edit Mode Toggle Button -->
+        <button id="btnToggleEdit" class="self-stretch sm:self-center bg-amber-100 hover:bg-amber-200 text-amber-700 font-bold px-4 py-3 rounded-xl flex sm:flex-col items-center justify-center gap-2 sm:gap-1 transition-colors text-xs border border-amber-200 min-w-[90px]">
             <i class="fa-solid fa-pen-to-square text-lg"></i>
             <span id="btnToggleEditText">へんしゅう</span>
         </button>
@@ -133,7 +173,6 @@
         audioSolve.load();
         audioAllClear.load();
         
-        // 空再生による強制ロック解除（エラーが出ても無視して進むようcatchを設定）
         audioSolve.play().then(() => { audioSolve.pause(); audioSolve.currentTime = 0; }).catch(() => {});
         audioAllClear.play().then(() => { audioAllClear.pause(); audioAllClear.currentTime = 0; }).catch(() => {});
     }
@@ -371,42 +410,227 @@
     btnToggleEdit.addEventListener('click', () => {
         isEditMode = !isEditMode;
         if (isEditMode) {
-            btnToggleEdit.className = "bg-red-100 hover:bg-red-200 text-red-700 font-bold px-4 py-3 rounded-xl flex flex-col items-center gap-1 text-xs border border-red-200 animate-pulse";
+            btnToggleEdit.className = "bg-red-100 hover:bg-red-200 text-red-700 font-bold px-4 py-3 rounded-xl flex flex-col items-center gap-1 text-xs border border-red-200 animate-pulse min-w-[90px]";
             btnToggleEditText.innerText = "おわる"; editNotice.classList.remove('hidden');
         } else {
-            btnToggleEdit.className = "bg-amber-100 hover:bg-amber-200 text-amber-700 font-bold px-4 py-3 rounded-xl flex flex-col items-center gap-1 text-xs border border-amber-200";
+            btnToggleEdit.className = "bg-amber-100 hover:bg-amber-200 text-amber-700 font-bold px-4 py-3 rounded-xl flex flex-col items-center gap-1 text-xs border border-amber-200 min-w-[90px]";
             btnToggleEditText.innerText = "へんしゅう"; editNotice.classList.add('hidden');
         }
         renderTasks();
     });
 
+    // --- アナログ時計の盤面初期化と描画処理 ---
+    function drawClockFace() {
+        const ticksGroup = document.getElementById('clockTicks');
+        const numbersGroup = document.getElementById('clockNumbers');
+        
+        if (!ticksGroup || !numbersGroup) return;
+        
+        ticksGroup.innerHTML = '';
+        numbersGroup.innerHTML = '';
+        
+        // 目盛り(60本)の描画
+        for (let i = 0; i < 60; i++) {
+            const angle = i * 6;
+            const angleRad = (angle - 90) * Math.PI / 180;
+            
+            let rStart = 90;
+            let rEnd = 95;
+            let strokeColor = '#e2e8f0';
+            let strokeWidth = 1;
+            
+            if (i % 5 === 0) {
+                // 5分刻み
+                rStart = 85;
+                strokeColor = '#94a3b8';
+                strokeWidth = 1.8;
+                if (i % 15 === 0) {
+                    // 12, 3, 6, 9時
+                    rStart = 81;
+                    strokeColor = '#475569';
+                    strokeWidth = 2.5;
+                }
+            }
+            
+            const x1 = 100 + rStart * Math.cos(angleRad);
+            const y1 = 100 + rStart * Math.sin(angleRad);
+            const x2 = 100 + rEnd * Math.cos(angleRad);
+            const y2 = 100 + rEnd * Math.sin(angleRad);
+            
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', x1);
+            line.setAttribute('y1', y1);
+            line.setAttribute('x2', x2);
+            line.setAttribute('y2', y2);
+            line.setAttribute('stroke', strokeColor);
+            line.setAttribute('stroke-width', strokeWidth);
+            line.setAttribute('stroke-linecap', 'round');
+            ticksGroup.appendChild(line);
+        }
+        
+        // 1〜12の数字の描画
+        const labelRadius = 69; // 数字を並べる円の半径
+        for (let h = 1; h <= 12; h++) {
+            const angle = h * 30;
+            const angleRad = (angle - 90) * Math.PI / 180;
+            const x = 100 + labelRadius * Math.cos(angleRad);
+            const y = 100 + labelRadius * Math.sin(angleRad);
+            
+            const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            text.setAttribute('x', x);
+            text.setAttribute('y', y);
+            text.setAttribute('fill', '#1e293b');
+            text.setAttribute('font-size', '17');
+            text.setAttribute('font-weight', '900');
+            text.setAttribute('text-anchor', 'middle');
+            text.setAttribute('dominant-baseline', 'central');
+            text.setAttribute('font-family', "'Hiragino Maru Gothic ProN', 'Yu Gothic', sans-serif");
+            text.textContent = h;
+            numbersGroup.appendChild(text);
+        }
+    }
+
+    // 残り時間表示（扇形・面用）のSVGパス取得関数
+    function describeArc(x, y, radius, startAngle, endAngle) {
+        const startAngleRad = (startAngle - 90) * Math.PI / 180;
+        const endAngleRad = (endAngle - 90) * Math.PI / 180;
+
+        const start = {
+            x: x + radius * Math.cos(startAngleRad),
+            y: y + radius * Math.sin(startAngleRad)
+        };
+        const end = {
+            x: x + radius * Math.cos(endAngleRad),
+            y: y + radius * Math.sin(endAngleRad)
+        };
+
+        let diff = endAngle - startAngle;
+        if (diff < 0) diff += 360;
+
+        const largeArcFlag = diff <= 180 ? "0" : "1";
+
+        const d = [
+            "M", x, y,
+            "L", start.x, start.y,
+            "A", radius, radius, 0, largeArcFlag, 1, end.x, end.y,
+            "Z"
+        ].join(" ");
+
+        return d;
+    }
+
+    // 残り時間表示（外周太円弧用）のSVGパス取得関数
+    function describeArcOuter(x, y, radius, startAngle, endAngle) {
+        const startAngleRad = (startAngle - 90) * Math.PI / 180;
+        const endAngleRad = (endAngle - 90) * Math.PI / 180;
+
+        const start = {
+            x: x + radius * Math.cos(startAngleRad),
+            y: y + radius * Math.sin(startAngleRad)
+        };
+        const end = {
+            x: x + radius * Math.cos(endAngleRad),
+            y: y + radius * Math.sin(endAngleRad)
+        };
+
+        let diff = endAngle - startAngle;
+        if (diff < 0) diff += 360;
+
+        const largeArcFlag = diff <= 180 ? "0" : "1";
+
+        const d = [
+            "M", start.x, start.y,
+            "A", radius, radius, 0, largeArcFlag, 1, end.x, end.y
+        ].join(" ");
+
+        return d;
+    }
+
+    // 時分秒針の回転および青塗り部分の毎秒更新
+    function updateClockHands(hours, minutes, seconds, depMinutes, showBlueArea) {
+        // 各針の角度計算（分針・時針は、1つ下位の単位を加えて滑らかに回転させます）
+        const secAngle = seconds * 6;
+        const minAngle = minutes * 6 + seconds * 0.1;
+        const hrAngle = (hours % 12) * 30 + minutes * 0.5;
+        
+        const hrHand = document.getElementById('hourHand');
+        const minHand = document.getElementById('minuteHand');
+        const secHand = document.getElementById('secondHand');
+        
+        if (hrHand) hrHand.setAttribute('transform', `rotate(${hrAngle} 100 100)`);
+        if (minHand) minHand.setAttribute('transform', `rotate(${minAngle} 100 100)`);
+        if (secHand) secHand.setAttribute('transform', `rotate(${secAngle} 100 100)`);
+        
+        const blueSector = document.getElementById('blueSector');
+        const blueArc = document.getElementById('blueArc');
+        
+        if (blueSector && blueArc) {
+            if (showBlueArea) {
+                const depAngle = depMinutes * 6; // 出発時刻の「分」が示す角度
+                
+                // 扇形（面）のパス更新 (半径91: 数字と被らないサイズに微調整)
+                const sectorD = describeArc(100, 100, 91, minAngle, depAngle);
+                blueSector.setAttribute('d', sectorD);
+                blueSector.style.display = 'block';
+                
+                // 外周の太い青いアーク（円弧）のパス更新 (半径88: 目盛り付近に美しく重ねる)
+                const arcD = describeArcOuter(100, 100, 88, minAngle, depAngle);
+                blueArc.setAttribute('d', arcD);
+                blueArc.style.display = 'block';
+            } else {
+                blueSector.style.display = 'none';
+                blueArc.style.display = 'none';
+            }
+        }
+    }
+
     // --- タイマー処理 ---
     function updateTime() {
         const now = new Date();
-        const hrs = String(now.getHours()).padStart(2, '0');
-        const mins = String(now.getMinutes()).padStart(2, '0');
-        document.getElementById('currentTime').innerText = `${hrs}:${mins}`;
+        const hrs = now.getHours();
+        const mins = now.getMinutes();
+        const secs = now.getSeconds();
+        
+        // デジタル表示の更新（補助用）
+        const hrsStr = String(hrs).padStart(2, '0');
+        const minsStr = String(mins).padStart(2, '0');
+        document.getElementById('currentTime').innerText = `${hrsStr}:${minsStr}`;
 
         const [depHours, depMinutes] = appData.departureTime.split(':').map(Number);
-        const depDate = new Date(); depDate.setHours(depHours, depMinutes, 0, 0);
+        const depDate = new Date(); 
+        depDate.setHours(depHours, depMinutes, 0, 0);
 
-        let diffMs = depDate - now; let isOver = false;
-        if (diffMs < 0) { isOver = true; diffMs = Math.abs(diffMs); }
+        let diffMs = depDate - now; 
+        let isOver = false;
+        if (diffMs < 0) { 
+            isOver = true; 
+            diffMs = Math.abs(diffMs); 
+        }
         const diffMins = Math.floor(diffMs / 1000 / 60);
 
-        const remainingMinutesSpan = document.getElementById('remainingMinutes');
         const remainingTimeDiv = document.getElementById('remainingTime');
+        let showBlueArea = false;
 
         if (isOver) {
             remainingTimeDiv.innerHTML = `⚠️ しゅっぱつじかんを <span class="text-orange-500 text-2xl mx-1 font-black">${diffMins}</span> 分 すぎています！`;
         } else {
-            remainingTimeDiv.innerHTML = `⏳ しゅっぱつまで あと <span class="text-orange-500 text-2xl" id="remainingMinutes">${diffMins}</span> 分`;
+            remainingTimeDiv.innerHTML = `⏳ しゅっぱつまで あと <span class="text-orange-500 text-2xl font-black" id="remainingMinutes">${diffMins}</span> 分`;
+            
+            // 【要件】残り時間は出発時刻の「30分前」から表示させる（それ以前は非表示にする）
+            if (diffMins <= 30) {
+                showBlueArea = true;
+            }
+
             [30, 20, 10, 5, 0].forEach(triggerMin => {
                 if (diffMins === triggerMin && appData.alarms[triggerMin] && !triggeredAlarms.has(triggerMin)) {
-                    triggerAlarm(triggerMin); triggeredAlarms.add(triggerMin);
+                    triggerAlarm(triggerMin); 
+                    triggeredAlarms.add(triggerMin);
                 }
             });
         }
+
+        // アナログ時計および残り時間青塗りの更新
+        updateClockHands(hrs, mins, secs, depMinutes, showBlueArea);
     }
 
     function triggerAlarm(minutes) {
@@ -426,7 +650,6 @@
 
     function closeAlarm() { document.getElementById('alarmOverlay').classList.add('hidden'); }
 
-    // 【修正箇所】スタートボタン押下時の処理順序の最適化
     function startApp() {
         // 1. まず確実にスタート画面（おおい）を非表示にしてメイン画面へ切り替える
         document.getElementById('startOverlay').classList.add('hidden');
@@ -453,6 +676,7 @@
     document.getElementById('btnSaveAndClose').addEventListener('click', () => {
         appData.departureTime = document.getElementById('departureTimeInput').value;
         saveData(); settingsModal.classList.add('hidden'); triggeredAlarms.clear();
+        updateTime(); // 保存後即座に時計表示に反映
     });
 
     function initSettingsUI() {
@@ -483,6 +707,7 @@
 
     window.onload = () => {
         loadData();
+        drawClockFace(); // アナログ時計の盤面を描画
         setInterval(updateTime, 1000);
         updateTime();
     };
