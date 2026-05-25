@@ -130,6 +130,14 @@
             </button>
         </div>
     </footer>
+
+    <!-- ぜんぶさいしょからやりなおすボタン -->
+    <div class="mt-4 pt-1">
+        <button id="btnResetAll" class="w-full bg-gradient-to-r from-red-400 to-rose-500 hover:from-red-500 hover:to-rose-600 text-white font-extrabold text-lg py-3.5 px-6 rounded-2xl shadow-md transform active:scale-95 transition-all flex items-center justify-center gap-2">
+            <i class="fa-solid fa-rotate-right"></i>
+            <span>ぜんぶさいしょからやりなおす</span>
+        </button>
+    </div>
 </div>
 
 <div id="alarmOverlay" class="hidden fixed inset-0 bg-black/60 z-40 flex items-center justify-center p-6">
@@ -160,6 +168,23 @@
         <button id="btnSaveAndClose" class="w-full bg-gradient-to-r from-amber-400 to-orange-500 text-white font-bold text-lg py-3 rounded-2xl transition-all">
             設定を保存して閉じる ✨
         </button>
+    </div>
+</div>
+
+<!-- さいしょからやりなおす確認モーダル -->
+<div id="resetConfirmModal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-6">
+    <div class="bg-white p-6 rounded-3xl text-center shadow-2xl max-w-sm border-4 border-amber-400">
+        <span class="text-6xl block mb-4">🔄</span>
+        <h3 class="text-2xl font-extrabold text-amber-600 mb-3">さいしょからやりなおす？</h3>
+        <p class="text-gray-600 font-bold mb-6 text-sm">できたマークが ぜんぶきえちゃうよ。ほんとうに やりなおす？</p>
+        <div class="flex gap-4">
+            <button id="btnCancelReset" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-extrabold py-3 rounded-xl transition-all active:scale-95 text-base">
+                やめる ❌
+            </button>
+            <button id="btnConfirmReset" class="flex-1 bg-gradient-to-r from-red-400 to-rose-500 text-white font-extrabold py-3 rounded-xl transition-all shadow-md active:scale-95 text-base">
+                やりなおす！ 🐾
+            </button>
+        </div>
     </div>
 </div>
 
@@ -704,6 +729,35 @@
     document.getElementById('newTaskInput').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') addTask();
     });
+
+    // さいしょからやりなおすボタンの処理
+    const btnResetAll = document.getElementById('btnResetAll');
+    const resetConfirmModal = document.getElementById('resetConfirmModal');
+    const btnCancelReset = document.getElementById('btnCancelReset');
+    const btnConfirmReset = document.getElementById('btnConfirmReset');
+
+    if (btnResetAll && resetConfirmModal && btnCancelReset && btnConfirmReset) {
+        btnResetAll.addEventListener('click', () => {
+            resetConfirmModal.classList.remove('hidden');
+        });
+
+        btnCancelReset.addEventListener('click', () => {
+            resetConfirmModal.classList.add('hidden');
+        });
+
+        btnConfirmReset.addEventListener('click', () => {
+            // 全タスクを未完了にリセット
+            appData.tasks.forEach(t => { 
+                t.done = false; 
+                delete t.assignedCharId; 
+            });
+            triggeredAlarms.clear();
+            saveData();
+            renderTasks();
+            resetConfirmModal.classList.add('hidden');
+            speakText("さいしょから、やりなおすよ！がんばろうね！");
+        });
+    }
 
     window.onload = () => {
         loadData();
